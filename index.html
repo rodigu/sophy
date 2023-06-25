@@ -1,0 +1,30 @@
+<html>
+  <head>
+    <script type="module" src="sophy_test.bundle.js"></script>
+    <style>
+      body {
+        background-color: black;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        align-content: center;
+        justify-content: center;
+      }
+      canvas {
+        image-rendering: optimizeSpeed; /* Older versions of FF          */
+        image-rendering: -moz-crisp-edges; /* FF 6.0+                       */
+        image-rendering: -webkit-optimize-contrast; /* Safari                        */
+        image-rendering: -o-crisp-edges; /* OS X & Windows Opera (12.02+) */
+        image-rendering: pixelated; /* Awesome future-browsers       */
+        -ms-interpolation-mode: nearest-neighbor; /* IE                            */
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <script type="module">
+      import { TESTER } from "./sophy_test.bundle.js";
+      TESTER(document.getElementById("canvas"));
+    </script>
+  </body>
+</html>
