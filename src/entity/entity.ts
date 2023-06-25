@@ -1,6 +1,8 @@
+import { SophyManager } from "../manager.ts";
 import { Size } from "../primitives.ts";
-import { Vector } from "../vector/vector.ts";
+import { Vector, VectorLike } from "../vector/vector.ts";
 import { EntitySettings } from "./settings.ts";
+import { Canvy } from "https://deno.land/x/canvy@v0.0.2/mod.ts";
 
 export class Entity implements EntitySettings {
   readonly id: string;
@@ -11,6 +13,7 @@ export class Entity implements EntitySettings {
   private behaviors: Map<string, () => void>;
   private behaviorsActive: Set<string>;
   private listeners: Map<string, (event: unknown) => void>;
+  private manager: SophyManager | undefined;
 
   /**
    * Events should use the BaseEvent format:
@@ -57,14 +60,17 @@ export class Entity implements EntitySettings {
 
   public size: Size;
   public rotation: number;
-  public scale: Size;
+  public scale: VectorLike;
   public position: Vector;
+  public tags: Set<string>;
 
-  constructor(id: string, layer: number) {
+  constructor(id: string, layer: number, manager?: SophyManager) {
     this.id = id;
     this.children = new Map();
     this.layers = [];
     this.layer = layer;
+
+    this.manager = manager;
 
     this.behaviorsActive = new Set();
     this.behaviors = new Map();
@@ -72,8 +78,9 @@ export class Entity implements EntitySettings {
 
     this.size = { width: 0, height: 0 };
     this.rotation = 0;
-    this.scale = { width: 0, height: 0 };
+    this.scale = { x: 1, y: 1 };
     this.position = new Vector(0, 0);
+    this.tags = new Set();
   }
 
   addListener(eventName: string, eventFunction: (event: any) => void) {
@@ -118,9 +125,28 @@ export class Entity implements EntitySettings {
    * Children run before their parent class.
    * @date 6/25/2023 - 3:06:37 PM
    */
-  runChildren() {
-    for (const layer of this.layers) layer.forEach((child) => child.run());
+  runChildren(canvy: Canvy) {
+    for (const layer of this.layers) layer.forEach((child) => child.run(canvy));
   }
 
-  run() {}
+  runBehaviors() {
+    for (const behavior of this.behaviors.values()) behavior();
+  }
+
+  applyTransformations(canvy: Canvy) {
+    canvy.translate(this.position.x, this.position.y);
+    canvy.rotate(this.rotation);
+    canvy.scale(this.scale.x, this.scale.y);
+  }
+
+  run(canvy: Canvy) {
+    if (!this.manager) throw new Error("Entities need a manager!");
+    canvy.push();
+
+    this.applyTransformations(canvy);
+    this.runBehaviors();
+    this.runChildren(canvy);
+
+    canvy.pop();
+  }
 }
