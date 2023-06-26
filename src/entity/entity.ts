@@ -8,12 +8,12 @@ export class Entity implements EntitySettings {
   readonly id: string;
   readonly children: Map<string, Entity>;
   readonly layers: Map<string, Entity>[];
-  readonly layer: number;
 
   private behaviors: Map<string, () => void>;
   private behaviorsActive: Set<string>;
   private listeners: Map<string, (event: unknown) => void>;
   private manager: SophyManager | undefined;
+  private layer: number;
 
   /**
    * Events should use the BaseEvent format:
@@ -68,19 +68,35 @@ export class Entity implements EntitySettings {
     this.id = id;
     this.children = new Map();
     this.layers = [];
-    this.layer = layer;
 
     this.manager = manager;
 
     this.behaviorsActive = new Set();
     this.behaviors = new Map();
     this.listeners = new Map();
+    this.layer = layer;
 
     this.size = { width: 0, height: 0 };
     this.rotation = 0;
     this.scale = { x: 1, y: 1 };
     this.position = new Vector(0, 0);
     this.tags = new Set();
+  }
+
+  moveToLayer(layer: number) {
+    this.layer = layer;
+  }
+
+  moveChildToLayer(child: string | Entity, layer: number) {
+    if (typeof child === "string") {
+      const childInstance = this.getChild(child);
+      if (!childInstance)
+        throw new Error(`Entity [${this.id}] has no child [${child}]`);
+      child = childInstance;
+    }
+    this.layers[child.layer].delete(child.id);
+    child.moveToLayer(layer);
+    this.layers[layer].set(child.id, child);
   }
 
   addListener(eventName: string, eventFunction: (event: any) => void) {
@@ -92,7 +108,8 @@ export class Entity implements EntitySettings {
   }
 
   activateBehavior(name: string) {
-    if (!this.behaviors.has(name)) return;
+    if (!this.behaviors.has(name))
+      throw `Entity ${this.id} has no behavior ${name}`;
     this.behaviorsActive.add(name);
   }
 
@@ -140,7 +157,7 @@ export class Entity implements EntitySettings {
   }
 
   run(canvy: Canvy) {
-    if (!this.manager) throw new Error("Entities need a manager!");
+    if (!this.manager) throw new Error(`Entity ${this.id} need a manager!`);
     canvy.push();
 
     this.applyTransformations(canvy);
