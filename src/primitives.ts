@@ -11,12 +11,12 @@ export interface BaseEvent {
   options: unknown;
 }
 
-export interface SophyBehavior {
+export interface SophyBehavior<Options> {
   name: string;
-  addTo: (entity: Entity) => void;
+  addTo: (entity: Entity, options?: Options) => void;
 }
 
-export interface SophyManagerState {
+export interface SophyManagerState<Options> {
   name: string;
-  addTo: (manager: SophyManager) => void;
+  addTo: (manager: SophyManager, options?: Options) => void;
 }

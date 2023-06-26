@@ -11,7 +11,6 @@ export class Entity implements EntitySettings {
 
   private behaviors: Map<string, () => void>;
   private behaviorsActive: Set<string>;
-  private listeners: Map<string, (event: unknown) => void>;
   private manager: SophyManager | undefined;
   private layer: number;
 
@@ -21,11 +20,11 @@ export class Entity implements EntitySettings {
    * {
    *   event1Name: {
    *     name: 'event1Name',
-   *     options: unknown,
+   *     event: CustomEvent,
    *   },
    *   event2Name: {
    *     name: 'event1Name',
-   *     options: unknown,
+   *     event: CustomEvent,
    *   }
    * }
    * ```
@@ -73,7 +72,6 @@ export class Entity implements EntitySettings {
 
     this.behaviorsActive = new Set();
     this.behaviors = new Map();
-    this.listeners = new Map();
     this.layer = layer;
 
     this.size = { width: 0, height: 0 };
@@ -100,11 +98,7 @@ export class Entity implements EntitySettings {
   }
 
   addListener(eventName: string, eventFunction: (event: any) => void) {
-    this.listeners.set(eventName, eventFunction);
-  }
-
-  removeListener(eventName: string) {
-    this.listeners.delete(eventName);
+    addEventListener(eventName, eventFunction);
   }
 
   activateBehavior(behaviorName: string) {
