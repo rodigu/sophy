@@ -107,15 +107,19 @@ export class Entity implements EntitySettings {
     this.listeners.delete(eventName);
   }
 
-  activateBehavior(name: string) {
-    if (!this.behaviors.has(name))
-      throw `Entity ${this.id} has no behavior ${name}`;
-    this.behaviorsActive.add(name);
+  activateBehavior(behaviorName: string) {
+    if (!this.behaviors.has(behaviorName))
+      throw `Entity [${this.id}] has no behavior [${behaviorName}]`;
+    this.behaviorsActive.add(behaviorName);
   }
 
-  addBehavior(name: string, behavior: () => void, doActivate = false) {
-    this.behaviors.set(name, behavior);
-    if (doActivate) this.behaviorsActive.add(name);
+  addBehavior(
+    newBehaviorName: string,
+    behavior: () => void,
+    doActivate = false
+  ) {
+    this.behaviors.set(newBehaviorName, behavior);
+    if (doActivate) this.behaviorsActive.add(newBehaviorName);
   }
 
   private addChildToLayer(entity: Entity) {
@@ -157,7 +161,7 @@ export class Entity implements EntitySettings {
   }
 
   run(canvy: Canvy) {
-    if (!this.manager) throw new Error(`Entity ${this.id} need a manager!`);
+    if (!this.manager) throw new Error(`Entity [${this.id}] need a manager!`);
     canvy.push();
 
     this.applyTransformations(canvy);
