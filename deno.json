@@ -1,7 +1,7 @@
 {
   "tasks": {
-    "watch": "deno bundle --watch index.ts canvy_test.bundle.js --config tsconfig.json",
+    "watch": "deno bundle --watch index.ts sophy_test.bundle.js --config tsconfig.json",
     "build": "deno task bundle",
-    "bundle": "deno bundle index.ts canvy_test.bundle.js --config tsconfig.json"
+    "bundle": "deno bundle index.ts sophy_test.bundle.js --config tsconfig.json"
   }
 }
