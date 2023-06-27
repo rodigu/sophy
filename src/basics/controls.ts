@@ -11,12 +11,16 @@ export class SophyBaseControls {
 
   static KeyboardControls: SophyBehavior<ControlsOptions> = {
     name: "sophy-keyboard-controls",
-    addTo: (entity: Entity, options?: ControlsOptions) => {},
+    addTo: (entity: Entity, doActivate = true, options?: ControlsOptions) => {},
   };
 
   static DirectionalMovement: SophyBehavior<SophyDirectionalControlsOptions> = {
     name: "sophy-directional-movement",
-    addTo: (entity: Entity, options?: SophyDirectionalControlsOptions) => {
+    addTo: (
+      entity: Entity,
+      doActivate = true,
+      options?: SophyDirectionalControlsOptions
+    ) => {
       if (options === undefined) {
         throwCustomError(
           SophyBaseControls.Errors.RequiresOptions,
@@ -40,7 +44,7 @@ export class SophyBaseControls {
             }
           }
         },
-        true
+        doActivate
       );
     },
   };

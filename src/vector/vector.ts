@@ -38,4 +38,11 @@ export class Vector implements VectorFunctions, VectorMath {
   copy() {
     return new Vector(this.x, this.y);
   }
+
+  static random(mag?: number) {
+    const v = new Vector(1, 0);
+    v.rotate(Math.random() * 2 * 3.14);
+    if (mag) v.setMag(mag);
+    return v;
+  }
 }

@@ -13,7 +13,7 @@ export interface BaseEvent {
 
 export interface SophyBehavior<Options> {
   name: string;
-  addTo: (entity: Entity, options?: Options) => void;
+  addTo: (entity: Entity, doActivate: boolean, options?: Options) => void;
 }
 
 export interface SophyManagerState<Options> {

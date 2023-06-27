@@ -1,5 +1,7 @@
 import { Entity, SophyManager } from "../../mod.ts";
+import { SophyBaseBehaviors } from "../../src/basics/behaviors.ts";
 import { SophyBaseControls } from "../../src/basics/controls.ts";
+import { Collider } from "../../src/collisions/collider.ts";
 
 export class PongPlayer extends Entity {
   static Behaviors = {
@@ -7,8 +9,8 @@ export class PongPlayer extends Entity {
   };
 
   static speed = {
-    up: -10,
-    down: 10,
+    up: -20,
+    down: 20,
   };
 
   static p1Controls = {
@@ -21,8 +23,18 @@ export class PongPlayer extends Entity {
     down: "k",
   };
 
+  readonly manager: SophyManager;
+
+  static Instances: PongPlayer[] = [];
+
   constructor(id: string, manager: SophyManager) {
     super(id, 1, manager);
+    this.manager = manager;
+    PongPlayer.Instances.push(this);
+    PongPlayer.speed = {
+      up: -manager.UnitSize / 8,
+      down: manager.UnitSize / 8,
+    };
   }
 
   static create(manager: SophyManager, options: -1 | 1) {
@@ -36,18 +48,40 @@ export class PongPlayer extends Entity {
 
     const controller = options === -1 ? "p1Controls" : "p2Controls";
 
-    SophyBaseControls.DirectionalMovement.addTo(player, {
+    SophyBaseControls.DirectionalMovement.addTo(player, true, {
       up: { key: PongPlayer[controller].up, speed: PongPlayer.speed.up },
       down: { key: PongPlayer[controller].down, speed: PongPlayer.speed.down },
       left: { key: "", speed: 0 },
       right: { key: "", speed: 0 },
     });
 
+    SophyBaseBehaviors.KeepWithinCanvas.addTo(player, true, {
+      x: player.size.width / 2,
+      y: player.size.height / 2,
+    });
+
     PongPlayer.DrawBehavior(player);
+    PongPlayer.AddCollider(player);
 
     manager.addChild(player);
 
     return player;
+  }
+
+  static AddCollider(player: PongPlayer) {
+    player.setCollider(
+      new Collider(
+        {
+          x: -player.size.width / 2,
+          y: -player.size.height / 2,
+        },
+        {
+          x: player.size.width / 2,
+          y: player.size.height / 2,
+        },
+        player.position
+      )
+    );
   }
 
   static DrawBehavior(player: PongPlayer) {

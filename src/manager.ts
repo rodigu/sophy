@@ -1,12 +1,16 @@
 import { Canvy } from "https://deno.land/x/canvy@v0.0.3/mod.ts";
 import { Entity } from "./entity/entity.ts";
 import { SophyBaseStates } from "./basics/states.ts";
+import { Vector, VectorLike } from "./vector/vector.ts";
 
 export class SophyManager extends Entity {
   static ID = "MANAGER_ID";
 
   readonly canvy: Canvy;
   readonly AssetMap: unknown;
+
+  readonly topLeft: VectorLike;
+  readonly bottomRight: VectorLike;
 
   private keySet: Set<string>;
   private states: Map<string, () => void>;
@@ -54,6 +58,16 @@ export class SophyManager extends Entity {
 
     this.position.x = canvy.width / 2;
     this.position.y = canvy.height / 2;
+
+    this.topLeft = {
+      x: -this.position.x,
+      y: -this.position.y,
+    };
+
+    this.bottomRight = {
+      x: this.position.x,
+      y: this.position.y,
+    };
 
     this._UnitSize = unitSize;
     this._UnitSqrt = Math.sqrt(unitSize);

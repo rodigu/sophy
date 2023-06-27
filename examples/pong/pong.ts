@@ -1,6 +1,7 @@
 import { Canvy } from "https://deno.land/x/canvy@v0.0.3/mod.ts";
 import { SophyManager } from "../../mod.ts";
 import { PongPlayer } from "./player.ts";
+import { PongBall } from "./ball.ts";
 
 export function Pong(cvy: Canvy) {
   cvy.width = window.innerWidth;
@@ -12,6 +13,7 @@ export function Pong(cvy: Canvy) {
 
   const p1 = PongPlayer.create(manager, -1);
   PongPlayer.create(manager, 1);
+  PongBall.create(manager);
 
   cvy.draw = () => {
     cvy.fill(0, 0, 0);

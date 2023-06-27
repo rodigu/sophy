@@ -175,6 +175,12 @@ class Vector {
     copy() {
         return new Vector(this.x, this.y);
     }
+    static random(mag) {
+        const v = new Vector(1, 0);
+        v.rotate(Math.random() * 2 * 3.14);
+        if (mag) v.setMag(mag);
+        return v;
+    }
 }
 class VectorMath {
     add(vector) {
@@ -260,6 +266,7 @@ class Entity {
     behaviors;
     behaviorsActive;
     layer;
+    collisionMapping;
     static Events;
     static Behaviors;
     static Settings;
@@ -269,11 +276,13 @@ class Entity {
     scale;
     position;
     tags;
+    _collider;
     constructor(id, layer, manager){
         this.id = id;
         this.children = new Map();
         this.layers = [];
         this.listeners = new Map();
+        this.collisionMapping = new Map();
         this.manager = manager;
         this.behaviorsActive = new Set();
         this.behaviors = new Map();
@@ -289,6 +298,21 @@ class Entity {
         };
         this.position = new Vector(0, 0);
         this.tags = new Set();
+    }
+    setCollider(collider) {
+        this._collider = collider;
+    }
+    addCollisionToMapping(entity, collidesWith, event) {
+        if (!this.collisionMapping.has(entity.id)) this.collisionMapping.set(entity.id, []);
+        const mapping = this.collisionMapping.get(entity.id);
+        mapping.push({
+            collidesWith,
+            event
+        });
+    }
+    get collider() {
+        if (this._collider === undefined) throw new Error(`Entity [${this.id}] has no collider.`);
+        return this._collider;
     }
     moveToLayer(layer) {
         this.layer = layer;
@@ -334,7 +358,18 @@ class Entity {
         return this.children.get(id);
     }
     runChildren(canvy) {
-        for (const layer of this.layers)layer?.forEach((child)=>child.run(canvy));
+        for (const layer of this.layers){
+            layer?.forEach((child)=>{
+                child.run(canvy);
+                const collisions = this.collisionMapping.get(child.id);
+                collisions?.forEach((collision)=>{
+                    const { collidesWith , event  } = collision;
+                    if (child.collider.collidesWith(collidesWith.collider)) {
+                        child.manager?.emitEvent(event.name, event.options);
+                    }
+                });
+            });
+        }
     }
     runBehaviors() {
         for (const behavior of this.behaviors.values())behavior();
@@ -367,6 +402,8 @@ class SophyManager extends Entity {
     static ID = "MANAGER_ID";
     canvy;
     AssetMap;
+    topLeft;
+    bottomRight;
     keySet;
     states;
     currentState;
@@ -394,6 +431,14 @@ class SophyManager extends Entity {
         this.currentState = SophyBaseStates.RunEntities.name;
         this.position.x = canvy.width / 2;
         this.position.y = canvy.height / 2;
+        this.topLeft = {
+            x: -this.position.x,
+            y: -this.position.y
+        };
+        this.bottomRight = {
+            x: this.position.x,
+            y: this.position.y
+        };
         this._UnitSize = unitSize;
         this._UnitSqrt = Math.sqrt(unitSize);
     }
@@ -456,17 +501,39 @@ const throwCustomError = (error, message)=>{
     error.message = message;
     throw error;
 };
+class SophyBaseBehaviors {
+    static Errors = {
+        BehaviorRequiresManager: new Error("Behavior requires entity with a manager.")
+    };
+    static KeepWithinCanvas = {
+        name: "keep-entity-withing-canvas",
+        addTo: (entity, doActivate = true, options = {
+            x: 0,
+            y: 0
+        })=>{
+            if (entity.manager === undefined) throwCustomError(SophyBaseBehaviors.Errors.BehaviorRequiresManager, `->KeepWithinCanvas`);
+            const manager = entity.manager;
+            const { canvy  } = manager;
+            entity.addBehavior(SophyBaseBehaviors.KeepWithinCanvas.name, ()=>{
+                if (entity.position.x < options.x + manager.topLeft.x) entity.position.x = options.x + manager.topLeft.x;
+                if (entity.position.y < options.y + manager.topLeft.y) entity.position.y = options.y + manager.topLeft.y;
+                if (entity.position.x > -options.x + manager.bottomRight.x) entity.position.x = -options.x + manager.bottomRight.x;
+                if (entity.position.y > -options.y + manager.bottomRight.y) entity.position.y = -options.y + manager.bottomRight.y;
+            }, doActivate);
+        }
+    };
+}
 class SophyBaseControls {
     static Errors = {
         RequiresOptions: new Error("Controller behavior function requires options.")
     };
     static KeyboardControls = {
         name: "sophy-keyboard-controls",
-        addTo: (entity, options)=>{}
+        addTo: (entity, doActivate = true, options)=>{}
     };
     static DirectionalMovement = {
         name: "sophy-directional-movement",
-        addTo: (entity, options)=>{
+        addTo: (entity, doActivate = true, options)=>{
             if (options === undefined) {
                 throwCustomError(SophyBaseControls.Errors.RequiresOptions, `Directional movement behavior.`);
             }
@@ -483,17 +550,78 @@ class SophyBaseControls {
                         entity.position[positionCoord] += options[key].speed;
                     }
                 }
-            }, true);
+            }, doActivate);
         }
     };
+}
+class Collider {
+    topLeft;
+    bottomRight;
+    parentPosition;
+    constructor(topLeft, bottomRight, parentPosition){
+        this.topLeft = topLeft;
+        this.bottomRight = bottomRight;
+        this.parentPosition = parentPosition;
+    }
+    static defaultCollider(parent) {
+        return new Collider({
+            x: -parent.size.width / 2,
+            y: -parent.size.height / 2
+        }, {
+            x: parent.size.width / 2,
+            y: parent.size.height / 2
+        }, parent.position);
+    }
+    get x0() {
+        return this.topLeft.x + this.parentPosition.x;
+    }
+    get y0() {
+        return this.topLeft.y + this.parentPosition.y;
+    }
+    get realTopLeft() {
+        return {
+            x: this.x0,
+            y: this.y0
+        };
+    }
+    get x1() {
+        return this.bottomRight.x + this.parentPosition.x;
+    }
+    get y1() {
+        return this.bottomRight.y + this.parentPosition.y;
+    }
+    get realBottomRight() {
+        return {
+            x: this.x1,
+            y: this.y1
+        };
+    }
+    get realBottomLeft() {
+        return {
+            x: this.topLeft.x + this.parentPosition.x,
+            y: this.bottomRight.y + this.parentPosition.y
+        };
+    }
+    get realTopRight() {
+        return {
+            x: this.bottomRight.x + this.parentPosition.x,
+            y: this.topLeft.y + this.parentPosition.y
+        };
+    }
+    pointIsIn(point) {
+        return point.x > this.x0 && point.x < this.x1 && point.y > this.y0 && point.y < this.y1;
+    }
+    collidesWith(other) {
+        return this.pointIsIn(other.realTopLeft) || this.pointIsIn(other.realBottomRight) || this.pointIsIn(other.realBottomLeft) || this.pointIsIn(other.realTopRight) || other.pointIsIn(this.realTopLeft) || other.pointIsIn(this.realBottomRight) || other.pointIsIn(this.realBottomLeft) || other.pointIsIn(this.realTopRight);
+    }
 }
 class PongPlayer extends Entity {
     static Behaviors = {
         Draw: "draw-pong-player"
     };
     static speed = {
-        up: -10,
-        down: 10
+        up: -20,
+        down: 20
     };
     static p1Controls = {
         up: "w",
@@ -503,8 +631,16 @@ class PongPlayer extends Entity {
         up: "o",
         down: "k"
     };
+    manager;
+    static Instances = [];
     constructor(id, manager){
         super(id, 1, manager);
+        this.manager = manager;
+        PongPlayer.Instances.push(this);
+        PongPlayer.speed = {
+            up: -manager.UnitSize / 8,
+            down: manager.UnitSize / 8
+        };
     }
     static create(manager, options) {
         const player = new PongPlayer((options + 1).toString(), manager);
@@ -512,7 +648,7 @@ class PongPlayer extends Entity {
         player.size.height = manager.UnitSize;
         player.size.width = manager.UnitSize / 5;
         const controller = options === -1 ? "p1Controls" : "p2Controls";
-        SophyBaseControls.DirectionalMovement.addTo(player, {
+        SophyBaseControls.DirectionalMovement.addTo(player, true, {
             up: {
                 key: PongPlayer[controller].up,
                 speed: PongPlayer.speed.up
@@ -530,9 +666,23 @@ class PongPlayer extends Entity {
                 speed: 0
             }
         });
+        SophyBaseBehaviors.KeepWithinCanvas.addTo(player, true, {
+            x: player.size.width / 2,
+            y: player.size.height / 2
+        });
         PongPlayer.DrawBehavior(player);
+        PongPlayer.AddCollider(player);
         manager.addChild(player);
         return player;
+    }
+    static AddCollider(player) {
+        player.setCollider(new Collider({
+            x: -player.size.width / 2,
+            y: -player.size.height / 2
+        }, {
+            x: player.size.width / 2,
+            y: player.size.height / 2
+        }, player.position));
     }
     static DrawBehavior(player) {
         const { canvy  } = player.manager;
@@ -540,6 +690,103 @@ class PongPlayer extends Entity {
             canvy.fill(255, 255, 255);
             canvy.rect(-player.size.width / 2, -player.size.height / 2, player.size.width, player.size.height);
         }, true);
+    }
+}
+class SophyHelpers {
+    static random(min, max) {
+        return Math.random() * (max - min) + min;
+    }
+    static randint(min, max) {
+        return Math.floor(SophyHelpers.random(min, max));
+    }
+    static randSign() {
+        return Math.sign(Math.random() - 0.5);
+    }
+    static randElement(list) {
+        return list[SophyHelpers.randint(0, list.length)];
+    }
+    static PI = 3.1415;
+    static randAngle(min, max) {
+        return SophyHelpers.random(min * SophyHelpers.PI, max * SophyHelpers.PI);
+    }
+}
+class PongBall extends Entity {
+    static Behaviors = {
+        Move: "move-ball",
+        Draw: "draw-ball",
+        Bound: "bound-ball"
+    };
+    static Events = {
+        CollisionWithPlayer: "ball-collides-with-player"
+    };
+    manager;
+    speed;
+    static Instances = [];
+    constructor(manager){
+        super("ball", 1);
+        this.manager = manager;
+        this.speed = Vector.random(9);
+        this.size.width = manager.UnitSize / 5;
+        this.size.height = manager.UnitSize / 5;
+        PongBall.Instances.push(this);
+    }
+    static MoveBehavior(ball) {
+        ball.addBehavior(PongBall.Behaviors.Move, ()=>{
+            ball.position.add(ball.speed);
+        }, true);
+    }
+    static DrawBehavior(ball) {
+        ball.addBehavior(PongBall.Behaviors.Draw, ()=>{
+            ball.manager.canvy.fill(255, 255, 255);
+            ball.manager.canvy.rect(-ball.size.width / 2, -ball.size.width / 2, ball.size.width, ball.size.height);
+        }, true);
+    }
+    static BoundaryBounce(ball) {
+        ball.addBehavior(PongBall.Behaviors.Bound, ()=>{
+            if (ball.position.y < ball.manager.topLeft.y + ball.size.height) ball.speed.y = -ball.speed.y;
+            else if (ball.position.y > ball.manager.bottomRight.y - ball.size.height) ball.speed.y = -ball.speed.y;
+        }, true);
+    }
+    static PlayerCollisionEmit(ball) {
+        ball.setCollider(Collider.defaultCollider(ball));
+        for (const instance of PongPlayer.Instances){
+            ball.manager.addCollisionToMapping(ball, instance, {
+                name: PongBall.Events.CollisionWithPlayer,
+                options: {}
+            });
+        }
+    }
+    static PlayerCollisionListen(ball) {
+        ball.addListener(PongBall.Events.CollisionWithPlayer, ()=>{
+            ball.speed.x = -ball.speed.x;
+            ball.speed.mult(SophyHelpers.random(0.9, 1.2));
+            if (ball.manager.isKeyPressed(PongPlayer.p1Controls.up) || ball.manager.isKeyPressed(PongPlayer.p2Controls.up)) {
+                if (ball.speed.y > 0) {
+                    ball.speed.y *= -1;
+                    ball.speed.mult(SophyHelpers.random(0.9, 1.2));
+                    ball.speed.x += SophyHelpers.random(0, 0.5) * Math.sign(ball.speed.x);
+                } else ball.speed.mult(SophyHelpers.random(0.8, 1.1));
+                ball.speed.y += SophyHelpers.random(-0.5, -0.1);
+            } else if (ball.manager.isKeyPressed(PongPlayer.p1Controls.down) || ball.manager.isKeyPressed(PongPlayer.p2Controls.down)) {
+                if (ball.speed.y < 0) {
+                    ball.speed.y *= -1;
+                    ball.speed.mult(SophyHelpers.random(0.9, 1.2));
+                    ball.speed.x += SophyHelpers.random(0, 0.5) * Math.sign(ball.speed.x);
+                } else ball.speed.mult(SophyHelpers.random(0.8, 1.1));
+                ball.speed.y += SophyHelpers.random(0.1, 0.5);
+            }
+            ball.position.add(ball.speed);
+        });
+    }
+    static create(manager) {
+        const ball = new PongBall(manager);
+        PongBall.DrawBehavior(ball);
+        PongBall.MoveBehavior(ball);
+        PongBall.BoundaryBounce(ball);
+        PongBall.PlayerCollisionEmit(ball);
+        PongBall.PlayerCollisionListen(ball);
+        manager.addChild(ball);
+        return ball;
     }
 }
 function Pong(cvy) {
@@ -550,6 +797,7 @@ function Pong(cvy) {
     manager.position.y = cvy.height / 2;
     PongPlayer.create(manager, -1);
     PongPlayer.create(manager, 1);
+    PongBall.create(manager);
     cvy.draw = ()=>{
         cvy.fill(0, 0, 0);
         cvy.rect(0, 0, cvy.width, cvy.height);
