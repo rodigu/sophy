@@ -2,16 +2,17 @@ import { SophyManager } from "../manager.ts";
 import { Size } from "../primitives.ts";
 import { Vector, VectorLike } from "../vector/vector.ts";
 import { EntitySettings } from "./settings.ts";
-import { Canvy } from "https://deno.land/x/canvy@v0.0.2/mod.ts";
+import { Canvy } from "https://deno.land/x/canvy@v0.0.3/mod.ts";
 
 export class Entity implements EntitySettings {
   readonly id: string;
   readonly children: Map<string, Entity>;
   readonly layers: Map<string, Entity>[];
+  readonly listeners: Map<string, (event: unknown) => void>;
+  readonly manager: SophyManager | undefined;
 
   private behaviors: Map<string, () => void>;
   private behaviorsActive: Set<string>;
-  private manager: SophyManager | undefined;
   private layer: number;
 
   /**
@@ -20,11 +21,11 @@ export class Entity implements EntitySettings {
    * {
    *   event1Name: {
    *     name: 'event1Name',
-   *     event: CustomEvent,
+   *     options: unknown,
    *   },
    *   event2Name: {
    *     name: 'event1Name',
-   *     event: CustomEvent,
+   *     options: unknown,
    *   }
    * }
    * ```
@@ -57,6 +58,8 @@ export class Entity implements EntitySettings {
    */
   static Settings: unknown;
 
+  static create: (manager: SophyManager, options: any) => Entity;
+
   public size: Size;
   public rotation: number;
   public scale: VectorLike;
@@ -67,6 +70,7 @@ export class Entity implements EntitySettings {
     this.id = id;
     this.children = new Map();
     this.layers = [];
+    this.listeners = new Map();
 
     this.manager = manager;
 
@@ -98,7 +102,12 @@ export class Entity implements EntitySettings {
   }
 
   addListener(eventName: string, eventFunction: (event: any) => void) {
-    addEventListener(eventName, eventFunction);
+    this.listeners.set(eventName, eventFunction);
+    this.manager?.entityListensTo(eventName, this);
+  }
+
+  emitEvent(eventName: string, options: unknown) {
+    this.manager?.emitEvent(eventName, options);
   }
 
   activateBehavior(behaviorName: string) {
@@ -141,7 +150,8 @@ export class Entity implements EntitySettings {
    * @date 6/25/2023 - 3:06:37 PM
    */
   runChildren(canvy: Canvy) {
-    for (const layer of this.layers) layer.forEach((child) => child.run(canvy));
+    for (const layer of this.layers)
+      layer?.forEach((child) => child.run(canvy));
   }
 
   runBehaviors() {

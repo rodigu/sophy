@@ -20,3 +20,8 @@ export interface SophyManagerState<Options> {
   name: string;
   addTo: (manager: SophyManager, options?: Options) => void;
 }
+
+export const throwCustomError = (error: Error, message: string): never => {
+  error.message = message;
+  throw error;
+};

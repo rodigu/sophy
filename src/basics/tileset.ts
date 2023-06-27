@@ -1,4 +1,4 @@
-import { Canvy } from "https://deno.land/x/canvy@v0.0.2/mod.ts";
+import { Canvy } from "https://deno.land/x/canvy@v0.0.3/mod.ts";
 import { Size } from "../primitives.ts";
 import { Vector, VectorLike } from "../vector/vector.ts";
 
